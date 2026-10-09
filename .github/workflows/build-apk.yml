@@ -78,7 +78,8 @@ jobs:
             done
           fi
 
-          echo "subprojects { configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10' } } }" >> android/build.gradle
+          # یکپارچه‌سازی کامل نسخه‌های کاتلین
+          echo "subprojects { configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22'; force 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22' } } }" >> android/build.gradle
           npx cap sync android
 
       - name: Build Debug APK
