@@ -8,27 +8,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract Project ZIP
+      - name: Extract Project ZIP and Preserve Edits
         run: |
+          # 1. گرفتن بکاپ از کدهای جدیدی که شما در گیت‌هاب ویرایش کرده‌اید
+          mkdir -p repo_src_backup
+          cp -r src/* repo_src_backup/ || true
+          cp App.tsx repo_app_backup.tsx || true
+          
+          # 2. استخراج فایل زیپ قدیمی
           unzip -o project.zip -d temp_extract
           SOURCE_DIR=$(find temp_extract -name "package.json" -printf '%h\n' | head -n 1)
           cp -r "$SOURCE_DIR"/. .
           mkdir -p src
+          
+          # 3. بازگرداندن کدهای جدید شما روی کدهای قدیمی زیپ
+          if [ -d "repo_src_backup" ] && [ "$(ls -A repo_src_backup)" ]; then
+            cp -r repo_src_backup/* src/
+          fi
+          if [ -f "repo_app_backup.tsx" ]; then
+            cp repo_app_backup.tsx src/App.tsx
+          fi
 
       - name: Set App Name
         run: |
           APP_NAME="مدیریت تخلیه بار"
-          echo "Setting App Name to: $APP_NAME"
           echo '{"appId": "com.loadmanagement.app", "appName": "'"$APP_NAME"'", "webDir": "dist", "bundledWebRuntime": false}' > capacitor.config.json
 
-      - name: Preserve Custom App Code
+      - name: Ensure Main Entry Exists
         run: |
-          if [ -f "App.tsx" ]; then
-            cp App.tsx src/App.tsx
-          elif [ -f "src/App.tsx" ]; then
-            echo "Using existing src/App.tsx"
-          fi
-          
           if [ ! -f "src/main.tsx" ] && [ ! -f "src/main.jsx" ]; then
             echo 'import React from "react"; import ReactDOM from "react-dom/client"; import App from "./App"; ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);' > src/main.tsx
           fi
@@ -62,13 +69,8 @@ jobs:
           sed -i "s/<string name=\"title_activity_main\">.*<\/string>/<string name=\"title_activity_main\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
 
           if [ -f "icon.png" ]; then
-            echo "Installing ImageMagick..."
             sudo apt-get update && sudo apt-get install -y imagemagick
-            
-            echo "Removing duplicate XML icons..."
             rm -rf android/app/src/main/res/mipmap-anydpi-v26
-
-            echo "Generating app icons..."
             for dir in android/app/src/main/res/mipmap-*; do
               if [ -d "$dir" ]; then
                 convert icon.png -resize 192x192 "$dir/ic_launcher.png"
@@ -90,9 +92,7 @@ jobs:
       - name: Sign Release APK
         run: |
           cd android/app/build/outputs/apk/release
-          # ساخت کلید امضای خودکار
           keytool -genkey -v -keystore release.keystore -alias app-alias -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=LoadManager, OU=App, O=Amini, C=IR"
-          # امضای رسمی برنامه
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | tail -1)
           $BUILD_TOOLS_DIR/apksigner sign --ks release.keystore --ks-pass pass:123456 --out app-release.apk app-release-unsigned.apk
 
