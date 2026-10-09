@@ -10,22 +10,11 @@ jobs:
 
       - name: Extract and Fix Project Structure
         run: |
-          # استخراج فایل ZIP
           unzip -o project.zip -d temp_extract
-          
-          # پیدا کردن پوشه‌ای که حاوی package.json است (حتی با نام فارسی و فاصله)
           SOURCE_DIR=$(find temp_extract -name "package.json" -printf '%h\n' | head -n 1)
-          
-          # کپی کردن محتویات آن پوشه به مسیر اصلی با رعایت فواصل
           cp -r "$SOURCE_DIR"/. .
-          
-          # ساخت پوشه src اگر وجود ندارد و انتقال App.tsx به داخل آن
           mkdir -p src
-          if [ -f "App.tsx" ]; then
-            mv "App.tsx" src/App.tsx
-          fi
-          
-          # اطمینان از وجود فایل اصلی برای Vite
+          if [ -f "App.tsx" ]; then mv "App.tsx" src/App.tsx; fi
           if [ ! -f "src/main.tsx" ] && [ ! -f "src/main.jsx" ]; then
             echo 'import React from "react"; import ReactDOM from "react-dom/client"; import App from "./App"; ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);' > src/main.tsx
           fi
@@ -41,14 +30,21 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install Project Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          # نصب اجباری ابزارهای خازنی (Capacitor)
+          npm install @capacitor/cli @capacitor/core @capacitor/android
 
       - name: Build Web Assets
         run: npm run build
 
-      - name: Add and Sync Android Platform
+      - name: Initialize and Sync Android
         run: |
+          # اطمینان از وجود فایل تنظیمات
+          if [ ! -f "capacitor.config.json" ]; then
+            echo '{"appId": "com.example.app", "appName": "LoadManagement", "webDir": "dist", "bundledWebRuntime": false}' > capacitor.config.json
+          fi
           npx cap add android || true
           npx cap sync android
 
