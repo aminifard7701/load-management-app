@@ -15,6 +15,17 @@ jobs:
           cp -r "$SOURCE_DIR"/. .
           mkdir -p src
 
+      - name: Set App Name
+        run: |
+          # -------------------------------------------------------------
+          # نام دلخواه برنامه خود را در خط زیر داخل کوتیشن تغییر دهید:
+          APP_NAME="مدیریت تخلیه بار"
+          # -------------------------------------------------------------
+          
+          echo "Setting App Name to: $APP_NAME"
+          # ساخت تنظیمات با نام جدید
+          echo '{"appId": "com.loadmanagement.app", "appName": "'"$APP_NAME"'", "webDir": "dist", "bundledWebRuntime": false}' > capacitor.config.json
+
       - name: Preserve Custom App Code
         run: |
           if [ -f "App.tsx" ]; then
@@ -47,11 +58,16 @@ jobs:
       - name: Build Web Assets
         run: npm run build
 
-      - name: Initialize Android and Apply Icon
+      - name: Initialize Android and Apply Name & Icon
         run: |
           npx cap add android || true
           
-          # اگر فایل icon.png آپلود شده باشد، جایگزین آیکون اصلی اندروید می‌شود
+          # اعمال نام جدید روی فایل‌های اصلی اندروید
+          APP_NAME="مدیریت تخلیه بار"
+          sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
+          sed -i "s/<string name=\"title_activity_main\">.*<\/string>/<string name=\"title_activity_main\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
+
+          # اعمال آیکون در صورت وجود فایل icon.png
           if [ -f "icon.png" ]; then
             echo "Generating app icons..."
             for dir in android/app/src/main/res/mipmap-*; do
