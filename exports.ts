@@ -2,12 +2,19 @@ import { dateLabel, fa } from './jalali';
 
 export type RecordEntry = { date: string; nissan: number; arisan: number; khavar: number; note: string };
 export type WageRates = { nissan: number; arisan: number; khavar: number };
+
 const wages = (r: RecordEntry, rates: WageRates) => r.nissan * rates.nissan + r.arisan * rates.arisan + r.khavar * rates.khavar;
 const totalWages = (rows: RecordEntry[], rates: WageRates) => rows.reduce((sum, r) => sum + wages(r, rates), 0);
 export const totalOf = (r: RecordEntry) => r.nissan + r.arisan + r.khavar;
-export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({ nissan: sum.nissan + r.nissan, arisan: sum.arisan + r.arisan, khavar: sum.khavar + r.khavar, total: sum.total + totalOf(r) }), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
+export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
+  nissan: sum.nissan + r.nissan,
+  arisan: sum.arisan + r.arisan,
+  khavar: sum.khavar + r.khavar,
+  total: sum.total + totalOf(r)
+}), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
 
-async function save(blob: Blob, name: string) {
+// تابع اختصاصی ذخیره‌سازی فایل در حافظه دستگاه
+export async function saveFileWithTarget(blob: Blob, filename: string, customFolder: string = 'تخلیه بار') {
   try {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
@@ -15,44 +22,66 @@ async function save(blob: Blob, name: string) {
       const res = reader.result as string;
       const base64Data = res.split(',')[1];
       const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+
+      // اگر در محیط اپلیکیشن اندروید اجرا شود
       if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
-        const { Filesystem, Directory } = await import('@capacitor/filesystem');
-        const { Share } = await import('@capacitor/share');
-        const savedFile = await Filesystem.writeFile({
-          path: name,
-          data: base64Data,
-          directory: Directory.Cache
-        });
-        await Share.share({
-          title: 'ذخیره/اشتراک‌گذاری فایل',
-          text: name,
-          url: savedFile.uri,
-          dialogTitle: 'ذخیره یا بازکردن فایل'
-        });
-        return;
+        try {
+          const { Filesystem, Directory } = await import('@capacitor/filesystem');
+          const folderName = customFolder.trim() || 'تخلیه بار';
+          
+          // ساخت پوشه در حافظه دستگاه (Documents)
+          try {
+            await Filesystem.mkdir({
+              path: folderName,
+              directory: Directory.Documents,
+              recursive: true
+            });
+          } catch (e) {
+            // اگر پوشه وجود داشته باشد خطا را نادیده می‌گیرد
+          }
+
+          const targetPath = `${folderName}/${filename}`;
+          const savedFile = await Filesystem.writeFile({
+            path: targetPath,
+            data: base64Data,
+            directory: Directory.Documents
+          });
+
+          // باز کردن پنجره ذخیره/اشتراک جهت تایید قطعی و دسترسی کاربر
+          try {
+            const { Share } = await import('@capacitor/share');
+            await Share.share({
+              title: 'فایل در حافظه ذخیره شد',
+              text: `فایل در پوشه "${folderName}" ذخیره شد: ${filename}`,
+              url: savedFile.uri,
+              dialogTitle: 'ذخیره یا باز کردن فایل'
+            });
+          } catch {}
+          return;
+        } catch (nativeErr) {
+          console.error('Error saving via capacitor filesystem:', nativeErr);
+        }
       }
+
+      // حالت اجرا در مرورگر / وب
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = name;
+      anchor.download = filename;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     };
-  } catch {
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = name;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error('Save failed:', err);
   }
 }
+
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-export function exportWord(rows: RecordEntry[], filename: string, rates: WageRates, titleText: string = 'گزارش تخلیه بار') {
+
+// ایجاد و خروجی گرفتن فایل استاندارد Word
+export function exportWord(rows: RecordEntry[], filename: string, rates: WageRates, targetFolder: string = 'تخلیه بار', titleText: string = 'گزارش تخلیه بار') {
   const totals = sumRows(rows);
   const totalCost = totalWages(rows, rates);
   
@@ -71,17 +100,91 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     </tr>
   `).join('');
 
-  const docHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${escapeXml(titleText)}</title><style>body { font-family: 'Tahoma', sans-serif; direction: rtl; text-align: right; padding: 20px; } h1 { color: #08795b; font-size: 18pt; margin-bottom: 5px; text-align: center; } h2 { color: #334b48; font-size: 13pt; margin-bottom: 15px; text-align: center; } .summary { background-color: #e8f5ef; border: 1px solid #08795b; padding: 12px; margin-bottom: 20px; border-radius: 6px; } table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 10pt; } th { background-color: #08795b; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #08795b; } .total-row { background-color: #eaf0ed; font-weight: bold; }</style></head><body><h1>مدیریت تخلیه بار روزانه</h1><h2>${escapeXml(titleText)}</h2><div class="summary"><p><b>تعداد روزهای ثبت‌شده:</b> ${fa(rows.length)} روز</p><p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} | خاور: ${fa(totals.khavar)})</p><p><b>مجموع کل دستمزد:</b> ${fa(totalCost.toLocaleString('en-US'))} تومان</p></div><table><thead><tr><th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع بار</th><th>توضیحات</th><th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th></tr></thead><tbody>${rowsHtml}<tr class="total-row"><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">مجموع کل</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.nissan)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.arisan)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.khavar)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.total)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">-</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.nissan * rates.nissan).toLocaleString('en-US'))}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.arisan * rates.arisan).toLocaleString('en-US'))}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.khavar * rates.khavar).toLocaleString('en-US'))}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totalCost.toLocaleString('en-US'))}</td></tr></tbody></table></body></html>`;
-  save(new Blob(['\uFEFF', docHtml], { type: 'application/msword;charset=utf-8' }), filename + '.doc');
+  const docHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+  <head><meta charset='utf-8'><title>${escapeXml(titleText)}</title>
+  <style>
+    body { font-family: 'Tahoma', sans-serif; direction: rtl; text-align: right; padding: 20px; }
+    h1 { color: #08795b; font-size: 18pt; margin-bottom: 5px; text-align: center; }
+    h2 { color: #334b48; font-size: 13pt; margin-bottom: 15px; text-align: center; }
+    .summary { background-color: #e8f5ef; border: 1px solid #08795b; padding: 12px; margin-bottom: 20px; border-radius: 6px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 10pt; }
+    th { background-color: #08795b; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #08795b; }
+    .total-row { background-color: #eaf0ed; font-weight: bold; }
+  </style></head>
+  <body>
+    <h1>مدیریت تخلیه بار روزانه</h1>
+    <h2>${escapeXml(titleText)}</h2>
+    <div class="summary">
+      <p><b>تعداد روزهای ثبت‌شده:</b> ${fa(rows.length)} روز</p>
+      <p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} | خاور: ${fa(totals.khavar)})</p>
+      <p><b>مجموع کل دستمزد:</b> ${fa(totalCost.toLocaleString('en-US'))} تومان</p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع بار</th><th>توضیحات</th>
+          <th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+        <tr class="total-row">
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">مجموع کل</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.nissan)}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.arisan)}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.khavar)}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.total)}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">-</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.nissan * rates.nissan).toLocaleString('en-US'))}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.arisan * rates.arisan).toLocaleString('en-US'))}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.khavar * rates.khavar).toLocaleString('en-US'))}</td>
+          <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totalCost.toLocaleString('en-US'))}</td>
+        </tr>
+      </tbody>
+    </table>
+  </body></html>`;
+
+  saveFileWithTarget(new Blob(['\uFEFF', docHtml], { type: 'application/msword;charset=utf-8' }), filename + '.doc', targetFolder);
 }
 
-export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRates) {
+// ایجاد و خروجی فایل Excel
+export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRates, targetFolder: string = 'تخلیه بار') {
   const totals = sumRows(rows);
   const totalCost = totalWages(rows, rates);
-  const rowsHtml = rows.map(r => `<tr><td style="border:1px solid #000;">${dateLabel(r.date)}</td><td style="border:1px solid #000;">${r.nissan}</td><td style="border:1px solid #000;">${r.arisan}</td><td style="border:1px solid #000;">${r.khavar}</td><td style="border:1px solid #000;">${totalOf(r)}</td><td style="border:1px solid #000;">${escapeXml(r.note || '-')}</td><td style="border:1px solid #000;">${r.nissan * rates.nissan}</td><td style="border:1px solid #000;">${r.arisan * rates.arisan}</td><td style="border:1px solid #000;">${r.khavar * rates.khavar}</td><td style="border:1px solid #000;">${wages(r, rates)}</td></tr>`).join('');
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body dir="rtl"><table border="1"><thead><tr style="background-color: #08795b; color: #ffffff;"><th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع کل</th><th>توضیحات</th><th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th></tr></thead><tbody>${rowsHtml}<tr style="background-color: #eaf0ed; font-weight: bold;"><td>مجموع کل</td><td>${totals.nissan}</td><td>${totals.arisan}</td><td>${totals.khavar}</td><td>${totals.total}</td><td>-</td><td>${totals.nissan * rates.nissan}</td><td>${totals.arisan * rates.arisan}</td><td>${totals.khavar * rates.khavar}</td><td>${totalCost}</td></tr></tbody></table></body></html>`;
-  save(new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename + '.xls');
+  const rowsHtml = rows.map(r => `<tr>
+    <td style="border:1px solid #000;">${dateLabel(r.date)}</td>
+    <td style="border:1px solid #000;">${r.nissan}</td>
+    <td style="border:1px solid #000;">${r.arisan}</td>
+    <td style="border:1px solid #000;">${r.khavar}</td>
+    <td style="border:1px solid #000;">${totalOf(r)}</td>
+    <td style="border:1px solid #000;">${escapeXml(r.note || '-')}</td>
+    <td style="border:1px solid #000;">${r.nissan * rates.nissan}</td>
+    <td style="border:1px solid #000;">${r.arisan * rates.arisan}</td>
+    <td style="border:1px solid #000;">${r.khavar * rates.khavar}</td>
+    <td style="border:1px solid #000;">${wages(r, rates)}</td>
+  </tr>`).join('');
+
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"></head><body dir="rtl">
+  <table border="1">
+    <thead>
+      <tr style="background-color: #08795b; color: #ffffff;">
+        <th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع کل</th><th>توضیحات</th>
+        <th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+      <tr style="background-color: #eaf0ed; font-weight: bold;">
+        <td>مجموع کل</td><td>${totals.nissan}</td><td>${totals.arisan}</td><td>${totals.khavar}</td><td>${totals.total}</td><td>-</td>
+        <td>${totals.nissan * rates.nissan}</td><td>${totals.arisan * rates.arisan}</td><td>${totals.khavar * rates.khavar}</td><td>${totalCost}</td>
+      </tr>
+    </tbody>
+  </table></body></html>`;
+
+  saveFileWithTarget(new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename + '.xls', targetFolder);
 }
+
 async function drawReport(rows: RecordEntry[], title: string, rates: WageRates): Promise<HTMLCanvasElement> {
   await document.fonts.ready;
   const canvas = document.createElement('canvas');
@@ -108,7 +211,7 @@ async function drawReport(rows: RecordEntry[], title: string, rates: WageRates):
   ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان  |  نرخ هر بار: نیسان ${fa(rates.nissan.toLocaleString('en-US'))}، آریسان ${fa(rates.arisan.toLocaleString('en-US'))}، خاور ${fa(rates.khavar.toLocaleString('en-US'))}`, 1080, 414);
   const cols = [1080, 755, 625, 495, 365];
   ctx.fillStyle = '#eaf0ed'; ctx.fillRect(85, 435, 1030, 58);
-  ctx.fillStyle = '#334b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
+  ctx.fillStyle = '#344b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
   ['تاریخ', 'نیسان', 'آریسان', 'خاور', 'جمع'].forEach((label, i) => ctx.fillText(label, cols[i], 474));
   ctx.font = '23px Vazirmatn, sans-serif';
   rows.forEach((r, i) => {
@@ -129,7 +232,6 @@ function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blo
   add('%PDF-1.4\n');
   const obj = (number: number, body: string) => { offsets[number] = offset; add(`${number} 0 obj\n${body}\nendobj\n`); };
   
-  // تنظیم سایز داینامیک برای جلوگیری از کشیدگی تصویر
   const pdfWidth = 595;
   const pdfHeight = Math.round((pdfWidth * imageHeight) / imageWidth);
 
@@ -148,15 +250,23 @@ function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blo
   return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
 }
 
-export async function exportImageOrPdf(rows: RecordEntry[], title: string, filename: string, type: 'jpg' | 'pdf', rates: WageRates) {
+export async function exportImageOrPdf(rows: RecordEntry[], title: string, filename: string, type: 'jpg' | 'pdf', rates: WageRates, targetFolder: string = 'تخلیه بار') {
   const canvas = await drawReport(rows, title, rates);
   const data = canvas.toDataURL('image/jpeg', 0.92);
   const raw = atob(data.split(',')[1]);
   const bytes = Uint8Array.from(raw, char => char.charCodeAt(0));
-  if (type === 'jpg') save(new Blob([bytes], { type: 'image/jpeg' }), filename + '.jpg');
-  else save(makePdf(bytes, canvas.width, canvas.height), filename + '.pdf');
+  if (type === 'jpg') {
+    saveFileWithTarget(new Blob([bytes], { type: 'image/jpeg' }), filename + '.jpg', targetFolder);
+  } else {
+    saveFileWithTarget(makePdf(bytes, canvas.width, canvas.height), filename + '.pdf', targetFolder);
+  }
 }
 
-export function exportBackup(rows: RecordEntry[], rates: WageRates) {
-  save(new Blob([JSON.stringify({ version: 2, records: rows, rates, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' }), 'poshtiban-bar-' + Date.now() + '.json');
+// تهیه نسخه پشتیبان
+export function exportBackup(rows: RecordEntry[], rates: WageRates, targetFolder: string = 'تخلیه بار') {
+  saveFileWithTarget(
+    new Blob([JSON.stringify({ version: 2, records: rows, rates, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' }),
+    'poshtiban-bar-' + Date.now() + '.json',
+    targetFolder
+  );
 }
