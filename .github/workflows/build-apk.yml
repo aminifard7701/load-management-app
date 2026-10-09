@@ -10,22 +10,22 @@ jobs:
 
       - name: Extract and Fix Project Structure
         run: |
-          mkdir temp_zip
-          unzip -o project.zip -d temp_zip
+          # استخراج فایل ZIP
+          unzip -o project.zip -d temp_extract
           
-          # پیدا کردن پوشه اصلی حاوی package.json و انتقال فایل‌ها به ریشه
-          PKG_DIR=$(find temp_zip -name "package.json" -exec dirname {} \; | head -n 1)
-          if [ -n "$PKG_DIR" ]; then
-            cp -r $PKG_DIR/* .
-          fi
+          # پیدا کردن پوشه‌ای که حاوی package.json است (حتی با نام فارسی و فاصله)
+          SOURCE_DIR=$(find temp_extract -name "package.json" -printf '%h\n' | head -n 1)
           
-          # اصلاح ساختار src در صورت نیاز
+          # کپی کردن محتویات آن پوشه به مسیر اصلی با رعایت فواصل
+          cp -r "$SOURCE_DIR"/. .
+          
+          # ساخت پوشه src اگر وجود ندارد و انتقال App.tsx به داخل آن
           mkdir -p src
           if [ -f "App.tsx" ]; then
-            mv App.tsx src/App.tsx
+            mv "App.tsx" src/App.tsx
           fi
           
-          # ساخت main.tsx در صورت عدم وجود
+          # اطمینان از وجود فایل اصلی برای Vite
           if [ ! -f "src/main.tsx" ] && [ ! -f "src/main.jsx" ]; then
             echo 'import React from "react"; import ReactDOM from "react-dom/client"; import App from "./App"; ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);' > src/main.tsx
           fi
