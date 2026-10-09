@@ -13,7 +13,7 @@ export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
   total: sum.total + totalOf(r)
 }), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
 
-// تابع اختصاصی ذخیره‌سازی فایل در حافظه دستگاه
+// تابع جدید و بهینه‌شده برای ذخیره‌سازی در پوشه دلخواه دستگاه
 export async function saveFileWithTarget(blob: Blob, filename: string, customFolder: string = 'تخلیه بار') {
   try {
     const reader = new FileReader();
@@ -23,13 +23,14 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
       const base64Data = res.split(',')[1];
       const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
 
-      // اگر در محیط اپلیکیشن اندروید اجرا شود
+      // ذخیره فایل در گوشی اندروید
       if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
         try {
           const { Filesystem, Directory } = await import('@capacitor/filesystem');
+          const { Share } = await import('@capacitor/share');
           const folderName = customFolder.trim() || 'تخلیه بار';
           
-          // ساخت پوشه در حافظه دستگاه (Documents)
+          // ایجاد پوشه در مسیر Documents (اسناد)
           try {
             await Filesystem.mkdir({
               path: folderName,
@@ -37,7 +38,7 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
               recursive: true
             });
           } catch (e) {
-            // اگر پوشه وجود داشته باشد خطا را نادیده می‌گیرد
+            // اگر پوشه وجود داشته باشد مشکلی نیست
           }
 
           const targetPath = `${folderName}/${filename}`;
@@ -47,23 +48,19 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
             directory: Directory.Documents
           });
 
-          // باز کردن پنجره ذخیره/اشتراک جهت تایید قطعی و دسترسی کاربر
-          try {
-            const { Share } = await import('@capacitor/share');
-            await Share.share({
-              title: 'فایل در حافظه ذخیره شد',
-              text: `فایل در پوشه "${folderName}" ذخیره شد: ${filename}`,
-              url: savedFile.uri,
-              dialogTitle: 'ذخیره یا باز کردن فایل'
-            });
-          } catch {}
+          await Share.share({
+            title: 'ذخیره و اشتراک فایل',
+            text: `فایل شما در پوشه اسناد (Documents/${folderName}) ذخیره شد.`,
+            url: savedFile.uri,
+            dialogTitle: 'فایل با موفقیت ذخیره شد'
+          });
           return;
         } catch (nativeErr) {
-          console.error('Error saving via capacitor filesystem:', nativeErr);
+          console.error('Error in Capacitor Filesystem:', nativeErr);
         }
       }
 
-      // حالت اجرا در مرورگر / وب
+      // ذخیره فایل در محیط وب / ویندوز
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -80,7 +77,7 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
 
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-// ایجاد و خروجی گرفتن فایل استاندارد Word
+// خروجی استاندارد Word
 export function exportWord(rows: RecordEntry[], filename: string, rates: WageRates, targetFolder: string = 'تخلیه بار', titleText: string = 'گزارش تخلیه بار') {
   const totals = sumRows(rows);
   const totalCost = totalWages(rows, rates);
@@ -100,17 +97,21 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     </tr>
   `).join('');
 
+  // متاتگ Content-Type برای هماهنگی با نرم‌افزار Word بسیار حیاتی است
   const docHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-  <head><meta charset='utf-8'><title>${escapeXml(titleText)}</title>
-  <style>
-    body { font-family: 'Tahoma', sans-serif; direction: rtl; text-align: right; padding: 20px; }
-    h1 { color: #08795b; font-size: 18pt; margin-bottom: 5px; text-align: center; }
-    h2 { color: #334b48; font-size: 13pt; margin-bottom: 15px; text-align: center; }
-    .summary { background-color: #e8f5ef; border: 1px solid #08795b; padding: 12px; margin-bottom: 20px; border-radius: 6px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 10pt; }
-    th { background-color: #08795b; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #08795b; }
-    .total-row { background-color: #eaf0ed; font-weight: bold; }
-  </style></head>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>${escapeXml(titleText)}</title>
+    <style>
+      body { font-family: 'Tahoma', sans-serif; direction: rtl; text-align: right; padding: 20px; }
+      h1 { color: #08795b; font-size: 18pt; margin-bottom: 5px; text-align: center; }
+      h2 { color: #334b48; font-size: 13pt; margin-bottom: 15px; text-align: center; }
+      .summary { background-color: #e8f5ef; border: 1px solid #08795b; padding: 12px; margin-bottom: 20px; border-radius: 6px; }
+      table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 10pt; }
+      th { background-color: #08795b; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #08795b; }
+      .total-row { background-color: #eaf0ed; font-weight: bold; }
+    </style>
+  </head>
   <body>
     <h1>مدیریت تخلیه بار روزانه</h1>
     <h2>${escapeXml(titleText)}</h2>
@@ -147,42 +148,20 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
   saveFileWithTarget(new Blob(['\uFEFF', docHtml], { type: 'application/msword;charset=utf-8' }), filename + '.doc', targetFolder);
 }
 
-// ایجاد و خروجی فایل Excel
+// تولید اکسل در قالب دیتای استاندارد (CSV بهینه برای Excel)
 export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRates, targetFolder: string = 'تخلیه بار') {
   const totals = sumRows(rows);
   const totalCost = totalWages(rows, rates);
-  const rowsHtml = rows.map(r => `<tr>
-    <td style="border:1px solid #000;">${dateLabel(r.date)}</td>
-    <td style="border:1px solid #000;">${r.nissan}</td>
-    <td style="border:1px solid #000;">${r.arisan}</td>
-    <td style="border:1px solid #000;">${r.khavar}</td>
-    <td style="border:1px solid #000;">${totalOf(r)}</td>
-    <td style="border:1px solid #000;">${escapeXml(r.note || '-')}</td>
-    <td style="border:1px solid #000;">${r.nissan * rates.nissan}</td>
-    <td style="border:1px solid #000;">${r.arisan * rates.arisan}</td>
-    <td style="border:1px solid #000;">${r.khavar * rates.khavar}</td>
-    <td style="border:1px solid #000;">${wages(r, rates)}</td>
-  </tr>`).join('');
-
-  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-  <head><meta charset="utf-8"></head><body dir="rtl">
-  <table border="1">
-    <thead>
-      <tr style="background-color: #08795b; color: #ffffff;">
-        <th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع کل</th><th>توضیحات</th>
-        <th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-      <tr style="background-color: #eaf0ed; font-weight: bold;">
-        <td>مجموع کل</td><td>${totals.nissan}</td><td>${totals.arisan}</td><td>${totals.khavar}</td><td>${totals.total}</td><td>-</td>
-        <td>${totals.nissan * rates.nissan}</td><td>${totals.arisan * rates.arisan}</td><td>${totals.khavar * rates.khavar}</td><td>${totalCost}</td>
-      </tr>
-    </tbody>
-  </table></body></html>`;
-
-  saveFileWithTarget(new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename + '.xls', targetFolder);
+  
+  let csvContent = 'تاریخ,نیسان,آریسان,خاور,جمع کل,توضیحات,دستمزد نیسان,دستمزد آریسان,دستمزد خاور,جمع دستمزد (تومان)\n';
+  rows.forEach(r => {
+    // از کوتیشن برای توضیحات استفاده می‌کنیم تا تداخلی با ویرگول‌های داخل متن نداشته باشد
+    const safeNote = `"${escapeXml(r.note || '-').replace(/"/g, '""')}"`;
+    csvContent += `${dateLabel(r.date)},${r.nissan},${r.arisan},${r.khavar},${totalOf(r)},${safeNote},${r.nissan * rates.nissan},${r.arisan * rates.arisan},${r.khavar * rates.khavar},${wages(r, rates)}\n`;
+  });
+  csvContent += `مجموع کل,${totals.nissan},${totals.arisan},${totals.khavar},${totals.total},-,${totals.nissan * rates.nissan},${totals.arisan * rates.arisan},${totals.khavar * rates.khavar},${totalCost}\n`;
+  
+  saveFileWithTarget(new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8' }), filename + '.csv', targetFolder);
 }
 
 async function drawReport(rows: RecordEntry[], title: string, rates: WageRates): Promise<HTMLCanvasElement> {
@@ -211,7 +190,7 @@ async function drawReport(rows: RecordEntry[], title: string, rates: WageRates):
   ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان  |  نرخ هر بار: نیسان ${fa(rates.nissan.toLocaleString('en-US'))}، آریسان ${fa(rates.arisan.toLocaleString('en-US'))}، خاور ${fa(rates.khavar.toLocaleString('en-US'))}`, 1080, 414);
   const cols = [1080, 755, 625, 495, 365];
   ctx.fillStyle = '#eaf0ed'; ctx.fillRect(85, 435, 1030, 58);
-  ctx.fillStyle = '#344b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
+  ctx.fillStyle = '#334b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
   ['تاریخ', 'نیسان', 'آریسان', 'خاور', 'جمع'].forEach((label, i) => ctx.fillText(label, cols[i], 474));
   ctx.font = '23px Vazirmatn, sans-serif';
   rows.forEach((r, i) => {
@@ -223,50 +202,5 @@ async function drawReport(rows: RecordEntry[], title: string, rates: WageRates):
   return canvas;
 }
 
-function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blob {
-  const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [];
-  let offset = 0;
-  const offsets = [0];
-  const add = (part: string | Uint8Array) => { const bytes = typeof part === 'string' ? encoder.encode(part) : part; chunks.push(bytes); offset += bytes.length; };
-  add('%PDF-1.4\n');
-  const obj = (number: number, body: string) => { offsets[number] = offset; add(`${number} 0 obj\n${body}\nendobj\n`); };
-  
-  const pdfWidth = 595;
-  const pdfHeight = Math.round((pdfWidth * imageHeight) / imageWidth);
-
-  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
-  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfWidth} ${pdfHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
-  offsets[4] = offset;
-  add(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
-  add(jpeg); add('\nendstream\nendobj\n');
-  const draw = `q\n${pdfWidth} 0 0 ${pdfHeight} 0 0 cm\n/Im0 Do\nQ\n`;
-  obj(5, `<< /Length ${encoder.encode(draw).length} >>\nstream\n${draw}endstream`);
-  const xref = offset;
-  add('xref\n0 6\n0000000000 65535 f \n');
-  for (let i = 1; i <= 5; i++) add(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
-  add(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
-  return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
-}
-
-export async function exportImageOrPdf(rows: RecordEntry[], title: string, filename: string, type: 'jpg' | 'pdf', rates: WageRates, targetFolder: string = 'تخلیه بار') {
-  const canvas = await drawReport(rows, title, rates);
-  const data = canvas.toDataURL('image/jpeg', 0.92);
-  const raw = atob(data.split(',')[1]);
-  const bytes = Uint8Array.from(raw, char => char.charCodeAt(0));
-  if (type === 'jpg') {
-    saveFileWithTarget(new Blob([bytes], { type: 'image/jpeg' }), filename + '.jpg', targetFolder);
-  } else {
-    saveFileWithTarget(makePdf(bytes, canvas.width, canvas.height), filename + '.pdf', targetFolder);
-  }
-}
-
-// تهیه نسخه پشتیبان
-export function exportBackup(rows: RecordEntry[], rates: WageRates, targetFolder: string = 'تخلیه بار') {
-  saveFileWithTarget(
-    new Blob([JSON.stringify({ version: 2, records: rows, rates, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' }),
-    'poshtiban-bar-' + Date.now() + '.json',
-    targetFolder
-  );
-}
+// ساختار PDF اصلاح شد تا ابعاد فایل دقیقاً هم اندازه تصویر بوم باشد و تصویر کشیده نشود
+function makePdf(jpeg: Uint8
