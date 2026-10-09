@@ -47,9 +47,22 @@ jobs:
       - name: Build Web Assets
         run: npm run build
 
-      - name: Initialize and Fix Android Gradle
+      - name: Initialize Android and Apply Icon
         run: |
           npx cap add android || true
+          
+          # اگر فایل icon.png آپلود شده باشد، جایگزین آیکون اصلی اندروید می‌شود
+          if [ -f "icon.png" ]; then
+            echo "Generating app icons..."
+            for dir in android/app/src/main/res/mipmap-*; do
+              if [ -d "$dir" ]; then
+                convert icon.png -resize 192x192 "$dir/ic_launcher.png"
+                convert icon.png -resize 192x192 "$dir/ic_launcher_round.png"
+                convert icon.png -resize 192x192 "$dir/ic_launcher_foreground.png"
+              fi
+            done
+          fi
+
           echo "subprojects { configurations.all { resolutionStrategy { force 'org.jetbrains.kotlin:kotlin-stdlib:1.9.10' } } }" >> android/build.gradle
           npx cap sync android
 
