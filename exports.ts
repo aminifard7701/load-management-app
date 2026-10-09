@@ -71,76 +71,17 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     </tr>
   `).join('');
 
-  const docHtml = `
-    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head>
-      <meta charset='utf-8'>
-      <title>${escapeXml(titleText)}</title>
-      <style>
-        body { font-family: 'Tahoma', sans-serif; direction: rtl; text-align: right; padding: 20px; }
-        h1 { color: #08795b; font-size: 18pt; margin-bottom: 5px; text-align: center; }
-        h2 { color: #334b48; font-size: 13pt; margin-bottom: 15px; text-align: center; }
-        .summary { background-color: #e8f5ef; border: 1px solid #08795b; padding: 12px; margin-bottom: 20px; border-radius: 6px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 10pt; }
-        th { background-color: #08795b; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #08795b; }
-        .total-row { background-color: #eaf0ed; font-weight: bold; }
-      </style>
-    </head>
-    <body>
-      <h1>مدیریت تخلیه بار روزانه</h1>
-      <h2>${escapeXml(titleText)}</h2>
-      <div class="summary">
-        <p><b>تعداد روزهای ثبت‌شده:</b> ${fa(rows.length)} روز</p>
-        <p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} | خاور: ${fa(totals.khavar)})</p>
-        <p><b>مجموع کل دستمزد:</b> ${fa(totalCost.toLocaleString('en-US'))} تومان</p>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>تاریخ</th>
-            <th>نیسان</th>
-            <th>آریسان</th>
-            <th>خاور</th>
-            <th>جمع بار</th>
-            <th>توضیحات</th>
-            <th>دستمزد نیسان</th>
-            <th>دستمزد آریسان</th>
-            <th>دستمزد خاور</th>
-            <th>جمع دستمزد (تومان)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-          <tr class="total-row">
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">مجموع کل</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.nissan)}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.arisan)}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.khavar)}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.total)}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">-</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.nissan * rates.nissan).toLocaleString('en-US'))}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.arisan * rates.arisan).toLocaleString('en-US'))}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.khavar * rates.khavar).toLocaleString('en-US'))}</td>
-            <td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totalCost.toLocaleString('en-US'))}</td>
-          </tr>
-        </tbody>
-      </table>
-    </body>
-    </html>
-  `;
-
+  const docHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${escapeXml(titleText)}</title><style>body { font-family: 'Tahoma', sans-serif; direction: rtl; text-align: right; padding: 20px; } h1 { color: #08795b; font-size: 18pt; margin-bottom: 5px; text-align: center; } h2 { color: #334b48; font-size: 13pt; margin-bottom: 15px; text-align: center; } .summary { background-color: #e8f5ef; border: 1px solid #08795b; padding: 12px; margin-bottom: 20px; border-radius: 6px; } table { border-collapse: collapse; width: 100%; margin-top: 10px; font-size: 10pt; } th { background-color: #08795b; color: #ffffff; font-weight: bold; padding: 8px; border: 1px solid #08795b; } .total-row { background-color: #eaf0ed; font-weight: bold; }</style></head><body><h1>مدیریت تخلیه بار روزانه</h1><h2>${escapeXml(titleText)}</h2><div class="summary"><p><b>تعداد روزهای ثبت‌شده:</b> ${fa(rows.length)} روز</p><p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} | خاور: ${fa(totals.khavar)})</p><p><b>مجموع کل دستمزد:</b> ${fa(totalCost.toLocaleString('en-US'))} تومان</p></div><table><thead><tr><th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع بار</th><th>توضیحات</th><th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th></tr></thead><tbody>${rowsHtml}<tr class="total-row"><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">مجموع کل</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.nissan)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.arisan)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.khavar)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totals.total)}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">-</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.nissan * rates.nissan).toLocaleString('en-US'))}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.arisan * rates.arisan).toLocaleString('en-US'))}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa((totals.khavar * rates.khavar).toLocaleString('en-US'))}</td><td style="padding:8px;border:1px solid #b2c2be;text-align:center;">${fa(totalCost.toLocaleString('en-US'))}</td></tr></tbody></table></body></html>`;
   save(new Blob(['\uFEFF', docHtml], { type: 'application/msword;charset=utf-8' }), filename + '.doc');
 }
-const headers = ['تاریخ', 'نیسان', 'آریسان', 'خاور', 'جمع کل', 'توضیحات', 'دستمزد نیسان (تومان)', 'دستمزد آریسان (تومان)', 'دستمزد خاور (تومان)', 'جمع دستمزد (تومان)'];
-const cells = (r: RecordEntry, rates: WageRates) => [dateLabel(r.date), r.nissan, r.arisan, r.khavar, totalOf(r), r.note, r.nissan * rates.nissan, r.arisan * rates.arisan, r.khavar * rates.khavar, wages(r, rates)];
-const totalsList = (rows: RecordEntry[], rates: WageRates) => { const s = sumRows(rows); return ['مجموع', s.nissan, s.arisan, s.khavar, s.total, '', s.nissan * rates.nissan, s.arisan * rates.arisan, s.khavar * rates.khavar, totalWages(rows, rates)]; };
 
 export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRates) {
-  const rowXml = (row: (string | number)[]) => `<Row>${row.map(value => `<Cell><Data ss:Type="${typeof value === 'number' ? 'Number' : 'String'}">${escapeXml(String(value))}</Data></Cell>`).join('')}</Row>`;
-  const xml = `<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="header"><Font ss:Bold="1"/><Interior ss:Color="#DBEEE8" ss:Pattern="Solid"/></Style></Styles><Worksheet ss:Name="گزارش تخلیه"><Table>${rowXml(headers)}${rows.map(r => rowXml(cells(r, rates))).join('')}${rowXml(totalsList(rows, rates))}</Table></Worksheet></Workbook>`;
-  save(new Blob(['\uFEFF', xml], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename + '.xls');
+  const totals = sumRows(rows);
+  const totalCost = totalWages(rows, rates);
+  const rowsHtml = rows.map(r => `<tr><td style="border:1px solid #000;">${dateLabel(r.date)}</td><td style="border:1px solid #000;">${r.nissan}</td><td style="border:1px solid #000;">${r.arisan}</td><td style="border:1px solid #000;">${r.khavar}</td><td style="border:1px solid #000;">${totalOf(r)}</td><td style="border:1px solid #000;">${escapeXml(r.note || '-')}</td><td style="border:1px solid #000;">${r.nissan * rates.nissan}</td><td style="border:1px solid #000;">${r.arisan * rates.arisan}</td><td style="border:1px solid #000;">${r.khavar * rates.khavar}</td><td style="border:1px solid #000;">${wages(r, rates)}</td></tr>`).join('');
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body dir="rtl"><table border="1"><thead><tr style="background-color: #08795b; color: #ffffff;"><th>تاریخ</th><th>نیسان</th><th>آریسان</th><th>خاور</th><th>جمع کل</th><th>توضیحات</th><th>دستمزد نیسان</th><th>دستمزد آریسان</th><th>دستمزد خاور</th><th>جمع دستمزد (تومان)</th></tr></thead><tbody>${rowsHtml}<tr style="background-color: #eaf0ed; font-weight: bold;"><td>مجموع کل</td><td>${totals.nissan}</td><td>${totals.arisan}</td><td>${totals.khavar}</td><td>${totals.total}</td><td>-</td><td>${totals.nissan * rates.nissan}</td><td>${totals.arisan * rates.arisan}</td><td>${totals.khavar * rates.khavar}</td><td>${totalCost}</td></tr></tbody></table></body></html>`;
+  save(new Blob(['\uFEFF', html], { type: 'application/vnd.ms-excel;charset=utf-8' }), filename + '.xls');
 }
-
 async function drawReport(rows: RecordEntry[], title: string, rates: WageRates): Promise<HTMLCanvasElement> {
   await document.fonts.ready;
   const canvas = document.createElement('canvas');
@@ -187,13 +128,18 @@ function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blo
   const add = (part: string | Uint8Array) => { const bytes = typeof part === 'string' ? encoder.encode(part) : part; chunks.push(bytes); offset += bytes.length; };
   add('%PDF-1.4\n');
   const obj = (number: number, body: string) => { offsets[number] = offset; add(`${number} 0 obj\n${body}\nendobj\n`); };
+  
+  // تنظیم سایز داینامیک برای جلوگیری از کشیدگی تصویر
+  const pdfWidth = 595;
+  const pdfHeight = Math.round((pdfWidth * imageHeight) / imageWidth);
+
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
   obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfWidth} ${pdfHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
   offsets[4] = offset;
   add(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
   add(jpeg); add('\nendstream\nendobj\n');
-  const draw = 'q\n595 0 0 842 0 0 cm\n/Im0 Do\nQ\n';
+  const draw = `q\n${pdfWidth} 0 0 ${pdfHeight} 0 0 cm\n/Im0 Do\nQ\n`;
   obj(5, `<< /Length ${encoder.encode(draw).length} >>\nstream\n${draw}endstream`);
   const xref = offset;
   add('xref\n0 6\n0000000000 65535 f \n');
