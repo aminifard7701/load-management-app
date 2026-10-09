@@ -17,13 +17,8 @@ jobs:
 
       - name: Set App Name
         run: |
-          # -------------------------------------------------------------
-          # نام دلخواه برنامه خود را در خط زیر داخل کوتیشن تغییر دهید:
           APP_NAME="مدیریت تخلیه بار"
-          # -------------------------------------------------------------
-          
           echo "Setting App Name to: $APP_NAME"
-          # ساخت تنظیمات با نام جدید
           echo '{"appId": "com.loadmanagement.app", "appName": "'"$APP_NAME"'", "webDir": "dist", "bundledWebRuntime": false}' > capacitor.config.json
 
       - name: Preserve Custom App Code
@@ -62,13 +57,13 @@ jobs:
         run: |
           npx cap add android || true
           
-          # اعمال نام جدید روی فایل‌های اصلی اندروید
           APP_NAME="مدیریت تخلیه بار"
           sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
           sed -i "s/<string name=\"title_activity_main\">.*<\/string>/<string name=\"title_activity_main\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
 
-          # اعمال آیکون در صورت وجود فایل icon.png
           if [ -f "icon.png" ]; then
+            echo "Installing ImageMagick..."
+            sudo apt-get update && sudo apt-get install -y imagemagick
             echo "Generating app icons..."
             for dir in android/app/src/main/res/mipmap-*; do
               if [ -d "$dir" ]; then
