@@ -1,4 +1,4 @@
-name: Build Android APK from ZIP
+name: Build Android APK
 on:
   workflow_dispatch:
 
@@ -8,8 +8,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract Project ZIP
-        run: unzip project.zip
+      - name: Extract and Fix Project Structure
+        run: |
+          mkdir temp_zip
+          unzip -o project.zip -d temp_zip
+          
+          # پیدا کردن پوشه اصلی حاوی package.json و انتقال فایل‌ها به ریشه
+          PKG_DIR=$(find temp_zip -name "package.json" -exec dirname {} \; | head -n 1)
+          if [ -n "$PKG_DIR" ]; then
+            cp -r $PKG_DIR/* .
+          fi
+          
+          # اصلاح ساختار src در صورت نیاز
+          mkdir -p src
+          if [ -f "App.tsx" ]; then
+            mv App.tsx src/App.tsx
+          fi
+          
+          # ساخت main.tsx در صورت عدم وجود
+          if [ ! -f "src/main.tsx" ] && [ ! -f "src/main.jsx" ]; then
+            echo 'import React from "react"; import ReactDOM from "react-dom/client"; import App from "./App"; ReactDOM.createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);' > src/main.tsx
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -22,22 +41,25 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install and Build
+      - name: Install Dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Add and Sync Android Platform
         run: |
-          npm install
-          npm run build
+          npx cap add android || true
+          npx cap sync android
 
-      - name: Capacitor Sync
-        run: npx cap sync android
-
-      - name: Build APK
+      - name: Build Debug APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
+          name: load-management-app
           path: android/app/build/outputs/apk/debug/app-debug.apk
