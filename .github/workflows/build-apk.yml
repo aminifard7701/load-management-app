@@ -64,6 +64,10 @@ jobs:
           if [ -f "icon.png" ]; then
             echo "Installing ImageMagick..."
             sudo apt-get update && sudo apt-get install -y imagemagick
+            
+            echo "Removing duplicate XML icons..."
+            rm -rf android/app/src/main/res/mipmap-anydpi-v26
+
             echo "Generating app icons..."
             for dir in android/app/src/main/res/mipmap-*; do
               if [ -d "$dir" ]; then
