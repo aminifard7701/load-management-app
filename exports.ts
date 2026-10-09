@@ -117,7 +117,7 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     <h2>${escapeXml(titleText)}</h2>
     <div class="summary">
       <p><b>تعداد روزهای ثبت‌شده:</b> ${fa(rows.length)} روز</p>
-      <p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} | خاور: ${fa(totals.khavar)})</p>
+      <p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} \vert{} خاور: ${fa(totals.khavar)})</p>
       <p><b>مجموع کل دستمزد:</b> ${fa(totalCost.toLocaleString('en-US'))} تومان</p>
     </div>
     <table>
@@ -185,22 +185,6 @@ async function drawReport(rows: RecordEntry[], title: string, rates: WageRates):
   ctx.fillStyle = '#08795b'; ctx.font = 'bold 29px Vazirmatn, sans-serif';
   ctx.fillText(`مجموع کل: ${fa(totals.total)} بار`, 1065, 354);
   ctx.font = '24px Vazirmatn, sans-serif';
-  ctx.fillText(`نیسان ${fa(totals.nissan)}  |  آریسان ${fa(totals.arisan)}  |  خاور ${fa(totals.khavar)}`, 670, 354);
+  ctx.fillText(`نیسان ${fa(totals.nissan)}  |  آریسان ${fa(totals.arisan)}  \vert{}  خاور ${fa(totals.khavar)}`, 670, 354);
   ctx.fillStyle = '#344b48'; ctx.font = '22px Vazirmatn, sans-serif';
-  ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان  |  نرخ هر بار: نیسان ${fa(rates.nissan.toLocaleString('en-US'))}، آریسان ${fa(rates.arisan.toLocaleString('en-US'))}، خاور ${fa(rates.khavar.toLocaleString('en-US'))}`, 1080, 414);
-  const cols = [1080, 755, 625, 495, 365];
-  ctx.fillStyle = '#eaf0ed'; ctx.fillRect(85, 435, 1030, 58);
-  ctx.fillStyle = '#334b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
-  ['تاریخ', 'نیسان', 'آریسان', 'خاور', 'جمع'].forEach((label, i) => ctx.fillText(label, cols[i], 474));
-  ctx.font = '23px Vazirmatn, sans-serif';
-  rows.forEach((r, i) => {
-    const y = 493 + i * 64;
-    if (i % 2 === 1) { ctx.fillStyle = '#f7faf8'; ctx.fillRect(85, y, 1030, 64); }
-    ctx.fillStyle = '#314642';
-    [dateLabel(r.date), fa(r.nissan), fa(r.arisan), fa(r.khavar), fa(totalOf(r))].forEach((value, index) => ctx.fillText(value, cols[index], y + 42));
-  });
-  return canvas;
-}
-
-// ساختار PDF اصلاح شد تا ابعاد فایل دقیقاً هم اندازه تصویر بوم باشد و تصویر کشیده نشود
-function makePdf(jpeg: Uint8
+  ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان  |  نرخ هر بار: نیسان ${fa(rates.nissan.toLocaleString('en-US'))}، آریسان ${fa(rates.ar
