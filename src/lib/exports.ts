@@ -13,7 +13,7 @@ export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
   total: sum.total + totalOf(r)
 }), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
 
-// ذخیره‌سازی خودکار در پوشه "مدیریت تخلیه بار" در حافظه اصلی (Documents)
+// تابع بدون کرش: استفاده از حافظه کش برنامه و منوی اشتراک اندروید
 export async function saveFileWithTarget(blob: Blob, filename: string) {
   try {
     const reader = new FileReader();
@@ -23,32 +23,25 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
       const base64Data = res.split(',')[1];
       const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
 
+      // محیط اندروید
       if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
         try {
           const { Filesystem, Directory } = await import('@capacitor/filesystem');
           const { Share } = await import('@capacitor/share');
-          const folderName = 'مدیریت تخلیه بار';
           
-          try {
-            await Filesystem.mkdir({
-              path: folderName,
-              directory: Directory.Documents,
-              recursive: true
-            });
-          } catch (e) { }
-
-          const targetPath = `${folderName}/${filename}`;
+          // فایل در مسیر کش داخلی اپلیکیشن ذخیره می‌شود (نیاز به هیچ مجوزی ندارد و کرش نمی‌کند)
           const savedFile = await Filesystem.writeFile({
-            path: targetPath,
+            path: filename,
             data: base64Data,
-            directory: Directory.Documents
+            directory: Directory.Cache
           });
 
+          // باز کردن منوی شیر (Share) اندروید
           await Share.share({
-            title: 'ذخیره فایل',
-            text: `فایل در حافظه اصلی (Documents/${folderName}) ذخیره شد.`,
+            title: 'ذخیره / اشتراک فایل',
+            text: filename,
             url: savedFile.uri,
-            dialogTitle: 'فایل با موفقیت ذخیره شد'
+            dialogTitle: 'ذخیره در گوشی یا ارسال'
           });
           return;
         } catch (nativeErr) {
@@ -56,6 +49,7 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
         }
       }
 
+      // محیط وب یا ویندوز
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
