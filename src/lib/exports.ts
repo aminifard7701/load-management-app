@@ -15,39 +15,64 @@ export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
 
 export async function saveFileWithTarget(blob: Blob, filename: string) {
   try {
-    const reader = new FileReader();
-    reader.readAsDataURL(blob);
-    reader.onloadend = async () => {
-      try {
-        const res = reader.result as string;
-        const base64Data = res.split(',')[1];
-        const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+    const cap = (window as any).Capacitor;
+    const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
 
-        if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
-          const { Filesystem, Directory } = await import('@capacitor/filesystem');
-          try { if (Filesystem.requestPermissions) await Filesystem.requestPermissions(); } catch (e) {}
-          const folderName = 'مدیریت تخلیه بار';
-          try { await Filesystem.mkdir({ path: folderName, directory: Directory.Documents, recursive: true }); } catch (e) {}
-          const targetPath = `${folderName}/${filename}`;
-          await Filesystem.writeFile({ path: targetPath, data: base64Data, directory: Directory.Documents });
-          alert(`✅ فایل با موفقیت ذخیره شد!\n\nمکان ذخیره: مدیریت فایل ➔ پوشه اسناد (Documents) ➔ ${folderName}\nنام فایل: ${filename}`);
-          return;
-        }
+    if (isNative) {
+      // تبدیل امن blob به base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const res = reader.result as string;
+          if (!res || !res.includes(',')) {
+            reject(new Error('تبدیل فایل ناموفق بود'));
+            return;
+          }
+          resolve(res.split(',')[1]);
+        };
+        reader.onerror = () => reject(new Error('خطا در خواندن فایل'));
+        reader.readAsDataURL(blob);
+      });
 
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = filename;
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-      } catch (nativeErr: any) {
-        alert('❌ خطا در ذخیره فایل (ممکن است مجوز دسترسی به حافظه را رد کرده باشید):\n' + nativeErr.message);
-      }
-    };
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const { Share } = await import('@capacitor/share');
+
+      // ذخیره موقت در Cache (روی همه نسخه‌های اندروید کار می‌کند)
+      await Filesystem.writeFile({
+        path: filename,
+        data: base64Data,
+        directory: Directory.Cache
+      });
+
+      const uriResult = await Filesystem.getUri({
+        directory: Directory.Cache,
+        path: filename
+      });
+
+      // باز کردن منوی اشتراک‌گذاری سیستم (کاربر می‌تواند فایل را در Downloads یا هر جایی ذخیره کند)
+      await Share.share({
+        title: 'ذخیره فایل',
+        text: filename,
+        url: uriResult.uri,
+        dialogTitle: 'فایل را ذخیره یا اشتراک‌گذاری کنید'
+      });
+
+      return;
+    }
+
+    // حالت وب / کامپیوتر
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+
   } catch (err: any) {
-    alert('❌ خطای غیرمنتظره:\n' + err.message);
+    console.error(err);
+    alert('خطا در ذخیره فایل:\n' + (err?.message || String(err)));
   }
 }
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
