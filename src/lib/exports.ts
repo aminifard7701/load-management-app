@@ -13,7 +13,7 @@ export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
   total: sum.total + totalOf(r)
 }), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
 
-// ذخیره‌سازی خودکار در پوشه "مدیریت تخلیه بار"
+// ذخیره‌سازی خودکار در پوشه "مدیریت تخلیه بار" در حافظه اصلی (Documents)
 export async function saveFileWithTarget(blob: Blob, filename: string) {
   try {
     const reader = new FileReader();
@@ -27,7 +27,7 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
         try {
           const { Filesystem, Directory } = await import('@capacitor/filesystem');
           const { Share } = await import('@capacitor/share');
-          const folderName = 'مدیریت تخلیه بار'; // نام پوشه ثابت
+          const folderName = 'مدیریت تخلیه بار';
           
           try {
             await Filesystem.mkdir({
@@ -46,7 +46,7 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
 
           await Share.share({
             title: 'ذخیره فایل',
-            text: `فایل در مسیر پوشه Documents/${folderName} ذخیره شد.`,
+            text: `فایل در حافظه اصلی (Documents/${folderName}) ذخیره شد.`,
             url: savedFile.uri,
             dialogTitle: 'فایل با موفقیت ذخیره شد'
           });
