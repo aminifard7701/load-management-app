@@ -136,4 +136,35 @@ function App() {
   const todayRecord = records.find(r => r.date === today);
   const editing = records.some(r => r.date === formDate);
   const filtered = useMemo(() => {
-    const q = en(search.trim()); return records.
+    const q = en(search.trim()); 
+    return records.filter(r => !q || r.date.includes(q) || dateLabel(r.date).includes(search.trim()) || r.note.includes(search.trim()));
+  }, [records, search]);
+  const earliestYear = Math.max(1300, Math.min(current.year - 5, reportYear, ...records.map(r => fromKey(r.date).year)));
+  const latestYear = Math.min(1500, Math.max(current.year + 2, reportYear, ...records.map(r => fromKey(r.date).year)));
+  const yearOptions = Array.from({ length: latestYear - earliestYear + 1 }, (_, i) => latestYear - i);
+
+  const selectDate = (key: string) => {
+    const existing = records.find(r => r.date === key); setFormDate(key);
+    setCounts(existing ? { nissan: String(existing.nissan), arisan: String(existing.arisan), khavar: String(existing.khavar) } : emptyCounts());
+    setNote(existing?.note ?? ''); setCalendarOpen(false); setNotice('');
+  };
+  
+  const editRecord = (r: RecordEntry) => { selectDate(r.date); navigate('entry'); };
+  const updateCount = (vehicle: Vehicle, value: string) => { setCounts(previous => ({ ...previous, [vehicle]: en(value).replace(/[^0-9]/g, '').slice(0, 6) })); };
+  const changeCount = (vehicle: Vehicle, delta: number) => updateCount(vehicle, String(Math.max(0, Math.min(999999, Number(counts[vehicle] || 0) + delta))));
+  
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (VEHICLES.some(v => counts[v.key] === '' || !Number.isSafeInteger(Number(counts[v.key])) || Number(counts[v.key]) < 0)) { setNotice('تعداد غیرمجاز است.'); return; }
+    const entry: RecordEntry = { date: formDate, nissan: Number(counts.nissan), arisan: Number(counts.arisan), khavar: Number(counts.khavar), note: note.trim().slice(0, 500) };
+    const wasEditing = editing;
+    if (saveRecords([...records.filter(r => r.date !== formDate), entry])) setNotice(wasEditing ? 'اطلاعات ویرایش شد.' : 'اطلاعات ثبت شد.');
+  };
+  
+  const deleteRecord = () => {
+    if (!deleteDate) return;
+    if (saveRecords(records.filter(r => r.date !== deleteDate))) { if (formDate === deleteDate) { setCounts(emptyCounts()); setNote(''); } setNotice('رکورد حذف شد.'); }
+    setDeleteDate(null);
+  };
+  
+  const moveCalendar = (delta: number) => { setCalendarMonth(prev => { const index = prev.year * 12 + prev.month - 1 + delta; return { year: Math.floor(index / 12), month: index % 12 + 1 }; });
