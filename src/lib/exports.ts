@@ -3,27 +3,18 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
     const cap = (window as any).Capacitor;
     const isNative = !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
 
-    // تبدیل امن به base64
     const base64Data = await new Promise<string>((resolve, reject) => {
-      try {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          try {
-            const res = reader.result as string;
-            if (!res || typeof res !== 'string' || !res.includes(',')) {
-              reject(new Error('تبدیل فایل ناموفق بود'));
-              return;
-            }
-            resolve(res.split(',')[1]);
-          } catch (e) {
-            reject(e);
-          }
-        };
-        reader.onerror = () => reject(new Error('خطا در خواندن فایل'));
-        reader.readAsDataURL(blob);
-      } catch (e) {
-        reject(e);
-      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const res = reader.result as string;
+        if (!res || !res.includes(',')) {
+          reject(new Error('تبدیل فایل ناموفق بود'));
+          return;
+        }
+        resolve(res.split(',')[1]);
+      };
+      reader.onerror = () => reject(new Error('خطا در خواندن فایل'));
+      reader.readAsDataURL(blob);
     });
 
     if (isNative) {
@@ -31,7 +22,6 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
         const { Share } = await import('@capacitor/share');
 
-        // ذخیره موقت در Cache (امن‌ترین مسیر در اندروید جدید)
         await Filesystem.writeFile({
           path: filename,
           data: base64Data,
@@ -43,7 +33,6 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
           path: filename
         });
 
-        // باز کردن منوی اشتراک‌گذاری سیستم
         await Share.share({
           title: 'ذخیره فایل',
           text: filename,
@@ -53,8 +42,6 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
 
         return;
       } catch (nativeErr: any) {
-        console.error('Native save error:', nativeErr);
-        // اگر Share کار نکرد، حداقل به کاربر پیام بده
         alert('خطا در ذخیره روی گوشی:\n' + (nativeErr?.message || String(nativeErr)));
         return;
       }
@@ -71,7 +58,6 @@ export async function saveFileWithTarget(blob: Blob, filename: string) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
 
   } catch (err: any) {
-    console.error('Save failed:', err);
     alert('خطا در ذخیره فایل:\n' + (err?.message || String(err)));
   }
 }
