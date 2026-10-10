@@ -13,8 +13,8 @@ export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
   total: sum.total + totalOf(r)
 }), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
 
-// تابع جدید و بهینه‌شده برای ذخیره‌سازی در پوشه دلخواه دستگاه
-export async function saveFileWithTarget(blob: Blob, filename: string, customFolder: string = 'تخلیه بار') {
+// ذخیره‌سازی خودکار در پوشه "مدیریت تخلیه بار"
+export async function saveFileWithTarget(blob: Blob, filename: string) {
   try {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
@@ -23,23 +23,19 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
       const base64Data = res.split(',')[1];
       const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
 
-      // ذخیره فایل در گوشی اندروید
       if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
         try {
           const { Filesystem, Directory } = await import('@capacitor/filesystem');
           const { Share } = await import('@capacitor/share');
-          const folderName = customFolder.trim() || 'تخلیه بار';
+          const folderName = 'مدیریت تخلیه بار'; // نام پوشه ثابت
           
-          // ایجاد پوشه در مسیر Documents (اسناد)
           try {
             await Filesystem.mkdir({
               path: folderName,
               directory: Directory.Documents,
               recursive: true
             });
-          } catch (e) {
-            // اگر پوشه وجود داشته باشد مشکلی نیست
-          }
+          } catch (e) { }
 
           const targetPath = `${folderName}/${filename}`;
           const savedFile = await Filesystem.writeFile({
@@ -49,8 +45,8 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
           });
 
           await Share.share({
-            title: 'ذخیره و اشتراک فایل',
-            text: `فایل شما در پوشه اسناد (Documents/${folderName}) ذخیره شد.`,
+            title: 'ذخیره فایل',
+            text: `فایل در مسیر پوشه Documents/${folderName} ذخیره شد.`,
             url: savedFile.uri,
             dialogTitle: 'فایل با موفقیت ذخیره شد'
           });
@@ -60,7 +56,6 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
         }
       }
 
-      // ذخیره فایل در محیط وب / ویندوز
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
@@ -77,8 +72,7 @@ export async function saveFileWithTarget(blob: Blob, filename: string, customFol
 
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
-// خروجی استاندارد Word
-export function exportWord(rows: RecordEntry[], filename: string, rates: WageRates, targetFolder: string = 'تخلیه بار', titleText: string = 'گزارش تخلیه بار') {
+export function exportWord(rows: RecordEntry[], filename: string, rates: WageRates, titleText: string = 'گزارش تخلیه بار') {
   const totals = sumRows(rows);
   const totalCost = totalWages(rows, rates);
   
@@ -97,7 +91,6 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     </tr>
   `).join('');
 
-  // متاتگ Content-Type برای هماهنگی با نرم‌افزار Word بسیار حیاتی است
   const docHtml = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -117,7 +110,7 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     <h2>${escapeXml(titleText)}</h2>
     <div class="summary">
       <p><b>تعداد روزهای ثبت‌شده:</b> ${fa(rows.length)} روز</p>
-      <p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار (نیسان: ${fa(totals.nissan)} | آریسان: ${fa(totals.arisan)} | خاور: ${fa(totals.khavar)})</p>
+      <p><b>مجموع بارهای تخلیه‌شده:</b> ${fa(totals.total)} بار</p>
       <p><b>مجموع کل دستمزد:</b> ${fa(totalCost.toLocaleString('en-US'))} تومان</p>
     </div>
     <table>
@@ -145,23 +138,21 @@ export function exportWord(rows: RecordEntry[], filename: string, rates: WageRat
     </table>
   </body></html>`;
 
-  saveFileWithTarget(new Blob(['\uFEFF', docHtml], { type: 'application/msword;charset=utf-8' }), filename + '.doc', targetFolder);
+  saveFileWithTarget(new Blob(['\uFEFF', docHtml], { type: 'application/msword;charset=utf-8' }), filename + '.doc');
 }
 
-// تولید اکسل در قالب دیتای استاندارد (CSV بهینه برای Excel)
-export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRates, targetFolder: string = 'تخلیه بار') {
+export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRates) {
   const totals = sumRows(rows);
   const totalCost = totalWages(rows, rates);
   
   let csvContent = 'تاریخ,نیسان,آریسان,خاور,جمع کل,توضیحات,دستمزد نیسان,دستمزد آریسان,دستمزد خاور,جمع دستمزد (تومان)\n';
   rows.forEach(r => {
-    // از کوتیشن برای توضیحات استفاده می‌کنیم تا تداخلی با ویرگول‌های داخل متن نداشته باشد
     const safeNote = `"${escapeXml(r.note || '-').replace(/"/g, '""')}"`;
     csvContent += `${dateLabel(r.date)},${r.nissan},${r.arisan},${r.khavar},${totalOf(r)},${safeNote},${r.nissan * rates.nissan},${r.arisan * rates.arisan},${r.khavar * rates.khavar},${wages(r, rates)}\n`;
   });
   csvContent += `مجموع کل,${totals.nissan},${totals.arisan},${totals.khavar},${totals.total},-,${totals.nissan * rates.nissan},${totals.arisan * rates.arisan},${totals.khavar * rates.khavar},${totalCost}\n`;
   
-  saveFileWithTarget(new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8' }), filename + '.csv', targetFolder);
+  saveFileWithTarget(new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8' }), filename + '.csv');
 }
 
 async function drawReport(rows: RecordEntry[], title: string, rates: WageRates): Promise<HTMLCanvasElement> {
@@ -187,10 +178,10 @@ async function drawReport(rows: RecordEntry[], title: string, rates: WageRates):
   ctx.font = '24px Vazirmatn, sans-serif';
   ctx.fillText(`نیسان ${fa(totals.nissan)}  |  آریسان ${fa(totals.arisan)}  |  خاور ${fa(totals.khavar)}`, 670, 354);
   ctx.fillStyle = '#344b48'; ctx.font = '22px Vazirmatn, sans-serif';
-  ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان  |  نرخ هر بار: نیسان ${fa(rates.nissan.toLocaleString('en-US'))}، آریسان ${fa(rates.arisan.toLocaleString('en-US'))}، خاور ${fa(rates.khavar.toLocaleString('en-US'))}`, 1080, 414);
+  ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان`, 1080, 414);
   const cols = [1080, 755, 625, 495, 365];
   ctx.fillStyle = '#eaf0ed'; ctx.fillRect(85, 435, 1030, 58);
-  ctx.fillStyle = '#344b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
+  ctx.fillStyle = '#334b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
   ['تاریخ', 'نیسان', 'آریسان', 'خاور', 'جمع'].forEach((label, i) => ctx.fillText(label, cols[i], 474));
   ctx.font = '23px Vazirmatn, sans-serif';
   rows.forEach((r, i) => {
@@ -210,10 +201,8 @@ function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blo
   const add = (part: string | Uint8Array) => { const bytes = typeof part === 'string' ? encoder.encode(part) : part; chunks.push(bytes); offset += bytes.length; };
   add('%PDF-1.4\n');
   const obj = (number: number, body: string) => { offsets[number] = offset; add(`${number} 0 obj\n${body}\nendobj\n`); };
-  
   const pdfWidth = imageWidth;
   const pdfHeight = imageHeight;
-
   obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
   obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
   obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfWidth} ${pdfHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
@@ -229,22 +218,21 @@ function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blo
   return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
 }
 
-export async function exportImageOrPdf(rows: RecordEntry[], title: string, filename: string, type: 'jpg' | 'pdf', rates: WageRates, targetFolder: string = 'تخلیه بار') {
+export async function exportImageOrPdf(rows: RecordEntry[], title: string, filename: string, type: 'jpg' | 'pdf', rates: WageRates) {
   const canvas = await drawReport(rows, title, rates);
   const data = canvas.toDataURL('image/jpeg', 0.92);
   const raw = atob(data.split(',')[1]);
   const bytes = Uint8Array.from(raw, char => char.charCodeAt(0));
   if (type === 'jpg') {
-    saveFileWithTarget(new Blob([bytes], { type: 'image/jpeg' }), filename + '.jpg', targetFolder);
+    saveFileWithTarget(new Blob([bytes], { type: 'image/jpeg' }), filename + '.jpg');
   } else {
-    saveFileWithTarget(makePdf(bytes, canvas.width, canvas.height), filename + '.pdf', targetFolder);
+    saveFileWithTarget(makePdf(bytes, canvas.width, canvas.height), filename + '.pdf');
   }
 }
 
-export function exportBackup(rows: RecordEntry[], rates: WageRates, targetFolder: string = 'تخلیه بار') {
+export function exportBackup(rows: RecordEntry[], rates: WageRates) {
   saveFileWithTarget(
     new Blob([JSON.stringify({ version: 2, records: rows, rates, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' }), 
-    'poshtiban-bar-' + Date.now() + '.json', 
-    targetFolder
+    'poshtiban-bar-' + Date.now() + '.json'
   );
-    }
+}
