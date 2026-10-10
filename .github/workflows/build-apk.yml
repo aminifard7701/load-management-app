@@ -10,18 +10,15 @@ jobs:
 
       - name: Extract Project ZIP and Preserve Edits
         run: |
-          # 1. گرفتن بکاپ از کدهای جدیدی که شما در گیت‌هاب ویرایش کرده‌اید
           mkdir -p repo_src_backup
           cp -r src/* repo_src_backup/ || true
           cp App.tsx repo_app_backup.tsx || true
           
-          # 2. استخراج فایل زیپ قدیمی
           unzip -o project.zip -d temp_extract
           SOURCE_DIR=$(find temp_extract -name "package.json" -printf '%h\n' | head -n 1)
           cp -r "$SOURCE_DIR"/. .
           mkdir -p src
           
-          # 3. بازگرداندن کدهای جدید شما روی کدهای قدیمی زیپ
           if [ -d "repo_src_backup" ] && [ "$(ls -A repo_src_backup)" ]; then
             cp -r repo_src_backup/* src/
           fi
@@ -56,6 +53,7 @@ jobs:
           npm install --legacy-peer-deps
           npm install @capacitor/cli @capacitor/core @capacitor/android
           npm install @capacitor/app @capacitor/status-bar
+          npm install @capacitor/filesystem @capacitor/share
 
       - name: Build Web Assets
         run: npm run build
