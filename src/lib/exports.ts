@@ -13,54 +13,64 @@ export const sumRows = (rows: RecordEntry[]) => rows.reduce((sum, r) => ({
   total: sum.total + totalOf(r)
 }), { nissan: 0, arisan: 0, khavar: 0, total: 0 });
 
-// تابع بدون کرش: استفاده از حافظه کش برنامه و منوی اشتراک اندروید
+// سیستم امن ذخیره فایل بدون کرش کردن
 export async function saveFileWithTarget(blob: Blob, filename: string) {
   try {
     const reader = new FileReader();
     reader.readAsDataURL(blob);
     reader.onloadend = async () => {
-      const res = reader.result as string;
-      const base64Data = res.split(',')[1];
-      const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+      try {
+        const res = reader.result as string;
+        const base64Data = res.split(',')[1];
+        const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
 
-      // محیط اندروید
-      if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
-        try {
+        if (cap && cap.isNativePlatform && cap.isNativePlatform()) {
           const { Filesystem, Directory } = await import('@capacitor/filesystem');
-          const { Share } = await import('@capacitor/share');
           
-          // فایل در مسیر کش داخلی اپلیکیشن ذخیره می‌شود (نیاز به هیچ مجوزی ندارد و کرش نمی‌کند)
-          const savedFile = await Filesystem.writeFile({
-            path: filename,
+          // تلاش برای گرفتن مجوز دسترسی به حافظه برای جلوگیری از کرش
+          try {
+            if (Filesystem.requestPermissions) {
+              await Filesystem.requestPermissions();
+            }
+          } catch (e) {}
+
+          const folderName = 'مدیریت تخلیه بار';
+          
+          try {
+            await Filesystem.mkdir({
+              path: folderName,
+              directory: Directory.Documents,
+              recursive: true
+            });
+          } catch (e) {}
+
+          const targetPath = `${folderName}/${filename}`;
+          
+          await Filesystem.writeFile({
+            path: targetPath,
             data: base64Data,
-            directory: Directory.Cache
+            directory: Directory.Documents
           });
 
-          // باز کردن منوی شیر (Share) اندروید
-          await Share.share({
-            title: 'ذخیره / اشتراک فایل',
-            text: filename,
-            url: savedFile.uri,
-            dialogTitle: 'ذخیره در گوشی یا ارسال'
-          });
+          // نمایش پیام موفقیت آمیز به جای باز کردن منوی اشتراک که باعث کرش میشد
+          alert(`✅ فایل با موفقیت ذخیره شد!\n\nمکان ذخیره: مدیریت فایل ➔ پوشه اسناد (Documents) ➔ ${folderName}\nنام فایل: ${filename}`);
           return;
-        } catch (nativeErr) {
-          console.error('Error in Capacitor Filesystem:', nativeErr);
         }
-      }
 
-      // محیط وب یا ویندوز
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = filename;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch (nativeErr: any) {
+        alert('❌ خطا در ذخیره فایل (ممکن است مجوز دسترسی به حافظه را رد کرده باشید):\n' + nativeErr.message);
+      }
     };
-  } catch (err) {
-    console.error('Save failed:', err);
+  } catch (err: any) {
+    alert('❌ خطای غیرمنتظره:\n' + err.message);
   }
 }
 
@@ -144,89 +154,4 @@ export function exportExcel(rows: RecordEntry[], filename: string, rates: WageRa
     const safeNote = `"${escapeXml(r.note || '-').replace(/"/g, '""')}"`;
     csvContent += `${dateLabel(r.date)},${r.nissan},${r.arisan},${r.khavar},${totalOf(r)},${safeNote},${r.nissan * rates.nissan},${r.arisan * rates.arisan},${r.khavar * rates.khavar},${wages(r, rates)}\n`;
   });
-  csvContent += `مجموع کل,${totals.nissan},${totals.arisan},${totals.khavar},${totals.total},-,${totals.nissan * rates.nissan},${totals.arisan * rates.arisan},${totals.khavar * rates.khavar},${totalCost}\n`;
-  
-  saveFileWithTarget(new Blob(['\uFEFF', csvContent], { type: 'text/csv;charset=utf-8' }), filename + '.csv');
-}
-
-async function drawReport(rows: RecordEntry[], title: string, rates: WageRates): Promise<HTMLCanvasElement> {
-  await document.fonts.ready;
-  const canvas = document.createElement('canvas');
-  canvas.width = 1200;
-  canvas.height = Math.max(1000, 540 + rows.length * 64);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('canvas unavailable');
-  const { width: w, height: h } = canvas;
-  ctx.fillStyle = '#f6f8f7'; ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(44, 44, w - 88, h - 88);
-  ctx.fillStyle = '#08795b'; ctx.fillRect(44, 44, w - 88, 14);
-  ctx.direction = 'rtl'; ctx.textAlign = 'right';
-  ctx.fillStyle = '#172b2a'; ctx.font = 'bold 46px Vazirmatn, sans-serif';
-  ctx.fillText('مدیریت تخلیه بار روزانه', 1100, 145);
-  ctx.font = '30px Vazirmatn, sans-serif'; ctx.fillStyle = '#5e7370'; ctx.fillText(title, 1100, 207);
-  ctx.font = '24px Vazirmatn, sans-serif'; ctx.fillText(`تعداد روزهای ثبت‌شده: ${fa(rows.length)}`, 1100, 255);
-  const totals = sumRows(rows);
-  ctx.fillStyle = '#e8f5ef'; ctx.fillRect(85, 289, 1030, 105);
-  ctx.fillStyle = '#08795b'; ctx.font = 'bold 29px Vazirmatn, sans-serif';
-  ctx.fillText(`مجموع کل: ${fa(totals.total)} بار`, 1065, 354);
-  ctx.font = '24px Vazirmatn, sans-serif';
-  ctx.fillText(`نیسان ${fa(totals.nissan)}  |  آریسان ${fa(totals.arisan)}  |  خاور ${fa(totals.khavar)}`, 670, 354);
-  ctx.fillStyle = '#344b48'; ctx.font = '22px Vazirmatn, sans-serif';
-  ctx.fillText(`جمع دستمزد: ${fa(totalWages(rows, rates).toLocaleString('en-US'))} تومان`, 1080, 414);
-  const cols = [1080, 755, 625, 495, 365];
-  ctx.fillStyle = '#eaf0ed'; ctx.fillRect(85, 435, 1030, 58);
-  ctx.fillStyle = '#334b48'; ctx.font = 'bold 24px Vazirmatn, sans-serif';
-  ['تاریخ', 'نیسان', 'آریسان', 'خاور', 'جمع'].forEach((label, i) => ctx.fillText(label, cols[i], 474));
-  ctx.font = '23px Vazirmatn, sans-serif';
-  rows.forEach((r, i) => {
-    const y = 493 + i * 64;
-    if (i % 2 === 1) { ctx.fillStyle = '#f7faf8'; ctx.fillRect(85, y, 1030, 64); }
-    ctx.fillStyle = '#314642';
-    [dateLabel(r.date), fa(r.nissan), fa(r.arisan), fa(r.khavar), fa(totalOf(r))].forEach((value, index) => ctx.fillText(value, cols[index], y + 42));
-  });
-  return canvas;
-}
-
-function makePdf(jpeg: Uint8Array, imageWidth: number, imageHeight: number): Blob {
-  const encoder = new TextEncoder();
-  const chunks: Uint8Array[] = [];
-  let offset = 0;
-  const offsets = [0];
-  const add = (part: string | Uint8Array) => { const bytes = typeof part === 'string' ? encoder.encode(part) : part; chunks.push(bytes); offset += bytes.length; };
-  add('%PDF-1.4\n');
-  const obj = (number: number, body: string) => { offsets[number] = offset; add(`${number} 0 obj\n${body}\nendobj\n`); };
-  const pdfWidth = imageWidth;
-  const pdfHeight = imageHeight;
-  obj(1, '<< /Type /Catalog /Pages 2 0 R >>');
-  obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pdfWidth} ${pdfHeight}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
-  offsets[4] = offset;
-  add(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`);
-  add(jpeg); add('\nendstream\nendobj\n');
-  const draw = `q\n${pdfWidth} 0 0 ${pdfHeight} 0 0 cm\n/Im0 Do\nQ\n`;
-  obj(5, `<< /Length ${encoder.encode(draw).length} >>\nstream\n${draw}endstream`);
-  const xref = offset;
-  add('xref\n0 6\n0000000000 65535 f \n');
-  for (let i = 1; i <= 5; i++) add(`${String(offsets[i]).padStart(10, '0')} 00000 n \n`);
-  add(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
-  return new Blob(chunks as BlobPart[], { type: 'application/pdf' });
-}
-
-export async function exportImageOrPdf(rows: RecordEntry[], title: string, filename: string, type: 'jpg' | 'pdf', rates: WageRates) {
-  const canvas = await drawReport(rows, title, rates);
-  const data = canvas.toDataURL('image/jpeg', 0.92);
-  const raw = atob(data.split(',')[1]);
-  const bytes = Uint8Array.from(raw, char => char.charCodeAt(0));
-  if (type === 'jpg') {
-    saveFileWithTarget(new Blob([bytes], { type: 'image/jpeg' }), filename + '.jpg');
-  } else {
-    saveFileWithTarget(makePdf(bytes, canvas.width, canvas.height), filename + '.pdf');
-  }
-}
-
-export function exportBackup(rows: RecordEntry[], rates: WageRates) {
-  saveFileWithTarget(
-    new Blob([JSON.stringify({ version: 2, records: rows, rates, exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' }), 
-    'poshtiban-bar-' + Date.now() + '.json'
-  );
-}
+  csvContent += `مجموع کل,${totals.nissan},${totals.
