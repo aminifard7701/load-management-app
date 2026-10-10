@@ -53,7 +53,6 @@ jobs:
           npm install --legacy-peer-deps
           npm install @capacitor/cli @capacitor/core @capacitor/android
           npm install @capacitor/app @capacitor/status-bar @capacitor/filesystem @capacitor/share
-      - name: Build Web Assets
         run: npm run build
 
       - name: Initialize Android and Apply Name & Icon
@@ -69,7 +68,8 @@ jobs:
           if [ -f "$MANIFEST" ]; then
             sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>' "$MANIFEST" || true
           fi
-
+sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>' "$MANIFEST" || true# افزایش حافظه برای جلوگیری از کرش هنگام ساخت PDF و عکس
+sed -i 's/<application/<application android:largeHeap="true"/' "$MANIFEST" || true
           if [ -f "icon.png" ]; then
             sudo apt-get update && sudo apt-get install -y imagemagick
             rm -rf android/app/src/main/res/mipmap-anydpi-v26
