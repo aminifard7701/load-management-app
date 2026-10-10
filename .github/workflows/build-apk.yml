@@ -52,8 +52,7 @@ jobs:
         run: |
           npm install --legacy-peer-deps
           npm install @capacitor/cli @capacitor/core @capacitor/android
-          npm install @capacitor/app @capacitor/status-bar
-          npm install @capacitor/filesystem @capacitor/share
+          npm install @capacitor/filesystem
 
       - name: Build Web Assets
         run: npm run build
@@ -65,6 +64,12 @@ jobs:
           APP_NAME="مدیریت تخلیه بار"
           sed -i "s/<string name=\"app_name\">.*<\/string>/<string name=\"app_name\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
           sed -i "s/<string name=\"title_activity_main\">.*<\/string>/<string name=\"title_activity_main\">$APP_NAME<\/string>/" android/app/src/main/res/values/strings.xml || true
+
+          # تزریق مجوزهای حیاتی برای ذخیره‌سازی فایل در اندروید
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>' "$MANIFEST" || true
+          fi
 
           if [ -f "icon.png" ]; then
             sudo apt-get update && sudo apt-get install -y imagemagick
